@@ -1,0 +1,117 @@
+kvm模块+cpu支持
+qemu虚拟化仿真工具实现系统设备仿真
+libvirt虚拟化管理程序,实现用户交互
+安装虚拟化服务器平台必备软件
+qemu-kvm   为kvm 提供底层仿真支持
+libvirt-daemon
+           libvirtd 守护进程,管理虚拟机
+libvirt-client
+           用户端软件,提供客户端管理命令
+libvirt-daemon-driver-qemu
+           libvirtd 连接 qemu 的驱劢
+
+两个配置文件:
+
+一个XML文件(虚拟机配置声明文件)
+    位置 /etc/libvirt/qemu/
+
+xml配置文件
+定义了一个虚拟机的名称、CPU、内存、虚拟磁盘、网卡等各种参数设置
+
+一个磁盘镜像文件(虚拟机的硬盘)
+    位置 /var/lib/libvirt/images/
+
+virsh命令工具介绍:
+      virsh console 虚拟机名称 （进入虚拟机命令行界面）
+查看KVM节点(服务器)信息:
+      virsh nodeinfo
+列出虚拟机:
+      virsh list [--all]
+查看指定虚拟机的信息:
+      virsh dominfo 虚拟机名称
+运行|重启|关闭指定的虚拟机:
+      virsh start|reboot|shutdown 虚拟机名称
+强制关闭指定的虚拟机:
+      virsh destroy 虚拟机名称
+将指定的虚拟机设为开机自动运行|关闭开机自动运行:
+      virsh autostart [--disable] 虚拟机名称
+
+qemu-img 是虚拟机的磁盘管理命令,支持非常多的磁盘格式,例如raw、qcow2、vdi、vmdk等等
+###############################################
+#特点\类型 #       RAW        #        QCOW2    #                              
+#          ######################################
+#kvm默认   #        否          #           是         #                  
+#          ######################################
+#I/O效率   #        高          #          较高        #                    
+#          ######################################
+#占用空间  #        大          #           小         #                  
+#          ######################################
+#压缩      #      不支持        #          支持        #                    
+#          ######################################
+#后端盘复用#      不支持        #          支持        #                   
+#          ######################################
+#快照      #      不支持        #          支持        #                
+##############################################
+
+qemu-img 命令 参数 块文件名称 大小
+常用的命令有:
+   create 创建一个磁盘
+   info 查看磁盘信息
+创建新的镜像盘文件:
+       qemu-img create -f 格式 磁盘路径 大小
+查询镜像盘文件的信息:
+       qemu-img info 磁盘路径
+-b 使用后端模板文件
+  例如:qemu-img create -b disk.img -f qcow2 disk1.img
+
+使用virsh客户端工具:
+连接本地:
+   virsh
+   virsh -c qemu:///system (默认选项)
+连接远程:
+   virsh -c qemu+ssh://user@ip.xx.xx.xx:port/system
+
+创建虚拟交换机:
+配置文件 /etc/libvirt/qemu/networks/xxx.xml
+
+虚拟机模板制作:
+
+禁用Selinux: 
+     /etc/selinux/config
+     SELINUX=disabled
+卸载防火墙与NetworkManager:
+     yum remove -y NetworkManager-* firewalld-* python-firewall
+配置yum 源:
+导入 gpg key
+     rpm --import ftp://192.168.1.254/centos7/RPM-GPG-KEY-CentOS-7
+常用系统命令安装:
+     yum install -y net-tools vim-enhanced bridge-utils psmisc 
+网卡及配置文件设置:
+     /etc/sysconfig/network-scripts/ifcfg-eth0
+禁用空路由:
+     /etc/sysconfig/network
+     NOZEROCONF="yes"
+添加Console 配置及初除磁盘分区里的个性化信息:
+     /etc/default/grub
+     GRUB_CMDLINE_LINUX="biosdevname=0 net.ifnames=0
+     console=ttyS0,115200n8"
+     GRUB_DISABLE_LINUX_UUID="true"
+     GRUB_ENABLE_LINUX_LABEL="true"
+重新生成grub.cfg:
+     grub2-mkconfig -o /boot/grub2/grub.cfg
+安装分区扩展软件:
+     yum install -y cloud-utils-growpart
+设置第一次开机自动扩容根目录:
+     chmod 755 /etc/rc.local
+根分区扩容:
+     LANG=C
+     /usr/bin/growpart /dev/vda 1
+     /usr/sbin/xfs_growfs /
+关闭虚拟机后执行信息清理工作:
+     virt-sysprep -d node
+
+离线访问虚拟机:
+基本用法:
+     guestmount -a 虚拟机磁盘路径 -i /挂载点
+
+

@@ -1,0 +1,116 @@
+什么是云计算:
+定义：云计算是一种按使用量付费的模式，这种模式提供可用的、便捷的、按需的网络访问，进入可配置的计算资源共享池（资源包括网络，服务器，存储，应用软件，服务），
+这些资源能够被快速提供，只需投入很少的管理工作，或与服务供应商进行很少的交互。
+
+IaaS:基础设施即服务
+IaaS通常分为三种用法:公有云、私有云和混合云
+PaaS:平台即服务(淘宝)
+SaaS:软件即服务(安卓市场)
+
+Openstack:
+OpenStack是一套IaaS解决方案
+OpenStack是一个开源的云计算管理平台
+
+Openstack主要组件:
+Horizon
+– 用于管理Openstack各种服务的、基于web的管理接口
+– 通过图形界面实现创建用户、管理网络、启劢实例等操作
+Keystone
+– 为其他服务提供认证和授权的集中身份管理服务
+– 也提供了集中的目录服务
+– 支持多种身份认证模式,如密码认证、令牌认证、以及AWS(亚马逊Web服务)登陆
+– 为用户和其他服务提供了SSO认证服务
+Neutron
+– 一种软件定义网络服务
+– 用于创建网络、子网、路由器、管理浮动IP地址
+– 可以实现虚拟交换机、虚拟路由器
+– 可用于在项目中创建VPN
+Cinder
+– 为虚拟机管理存储卷的服务
+– 为运行在Nova中的实例提供永久的块存储
+– 可以通过快照进行数据备份
+– 经常应用在实例存储环境中,如数据库文件
+Nova
+– 在节点上用于管理虚拟机的服务
+– Nova是一个分布式的服务,能够与Keystone交互实现认证,与Glance交互实现镜像管理
+– Nova被设计成在标准硬件上能够进行水平扩展
+– 启动实例时,如果有则需要下载镜像
+Glance
+– 扮演虚拟机镜像注册的角色
+– 允许用户为直接存储拷贝服务器镜像
+– 这些镜像可以用于新建虚拟机的模板
+
+
+配置yum仓库:
+1. CentOS7-1708光盘内容作为仓库源
+2. 配置RHEL7-extars内容加入仓库源
+3. RHEL7OSP-10光盘中包含多个目录,每个目录都是仓库源(可以使用脚本生成)
+
+配置DNS服务器:
+1. 允许DNS服务器为所有的客户端提供服务
+2. 解析域名 openstack
+3. 解析域名 nova
+DNS服务器不能与openstack安装在同一台主机上
+
+配置NTP服务:
+修改配置文件/etc/chrony.conf
+   server ntp1.aliyun.com iburst
+   bindacqaddress 0.0.0.0
+   allow 0/0
+   cmdallow 127.0.0.1  //控制指令
+chronyc sources -v     //出现*号代表 NTP 时间可用
+将NTP服务与DNS服务部署在同一台主机上
+计划安装openstack的服务器与NTP服务器进行时间校正
+
+配置卷组
+Openstack为虚拟机提供的云硬盘,本质上是本地的逻辑卷
+逻辑卷创建于名为cinder-volumes的卷组
+
+安装依赖软件包:
+   yum -y install  qemu-kvm libvirt-client libvirt-daemon libvirt-daemon-driver-qemu python-setuptools
+
+配置packstack:
+安装packstack:
+   yum -y install  openstack-packstack
+生成应答文件:
+   packstack --gen-answer-file answer.txt
+修改应答文件:
+11 CONFIG_DEFAULT_PASSWORD=redhat                      //密码
+42 CONFIG_SWIFT_INSTALL=n
+75 CONFIG_NTP_SERVERS=192.168.1.3                      //时间服务器的地址
+554 CONFIG_CINDER_VOLUMES_CREATE=n                     //创建卷,已经手动创建过了
+840 CONFIG_NEUTRON_ML2_TYPE_DRIVERS=flat,vxlan         //驱动类型
+876 CONFIG_NEUTRON_ML2_VXLAN_GROUP=239.1.1.5           //设置组播地址,最后一个随意不能为0和255,其他固定
+910 CONFIG_NEUTRON_OVS_BRIDGE_MAPPINGS=physnet1:br-ex  //物理网桥的名称
+921 CONFIG_NEUTRON_OVS_BRIDGE_IFACES=br-ex:eth0        //br-ex 桥的名称与eth0 连接,管理eth0,网桥与哪个物理网卡连接
+936 CONFIG_NEUTRON_OVS_TUNNEL_IF=eth1
+1179 CONFIG_PROVISION_DEMO=n                           //DEMO 是否测试
+
+一键部署Openstack: packstack --answer-file answer.txt
+配置br-ex为外部OVS网桥:
+/etc/sysconfig/network-scripts/ifcfg-br-ex
+ONBOOT="yes"
+NM_CONTROLLED="no"
+IPADDR="192.168.1.66"
+PREFIX="24"
+GATEWAY="192.168.1.254"
+DEVICE=br-ex
+NAME=br-ex
+DEVICETYPE=ovs
+OVSBOOTPROTO="static"
+TYPE=OVSBridge
+验证OVS配置:
+1. ovs-vsctl show
+2. ip -o addr show
+
+Horizon BUG 处理:
+在/etc/httpd/conf.d/15-horizon_vhost.conf下
+       WSGIApplicationGroup %{GLOBAL}
+重新载入配置文件 apache graceful
+
+安装额外的计算节点:
+vim  answer.ini   //在 openstack上面操作
+CONFIG_COMPUTE_HOSTS=192.168.1.1,192.168.1.2
+CONFIG_NETWORK_HOSTS=192.168.1.1,192.168.1.2
+
+
