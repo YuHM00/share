@@ -1,0 +1,13 @@
+https://blog.csdn.net/cbuy888/article/category/7674387
+
+logstash插件及文档地址:
+https://github.com/logstash-plugins
+
+金步国作品集:
+http://www.jinbuguo.com/
+
+hadoop官方文档:
+http://hadoop.apache.org/docs/stable/
+
+Zookeeper管理文档:
+http://zookeeper.apache.org/doc/r3.4.10/zookeeperAdmin.html
